@@ -61,7 +61,7 @@ class DevDocsService():
           except:
             docs = []
 
-        docs = self.python_version_fallback(docs)
+        docs = self.version_fallback(docs)
         self.docs_to_fetch = docs
 
     def index(self):
@@ -149,40 +149,52 @@ class DevDocsService():
 
         return None
 
-    def python_version_fallback(self, docs_to_fetch):
+    def parse_version_to_tuple(self, version_str):
       """
-      If 'python' is present in docs_to_fetch (without version),
-      automatically replace it with the highest python~X.Y version from devdocs
+      Parses version string (3.10 or 4.1.2) in to a tuple of ints for easy sorting
+      If segment can't be converted to an int (such as 'beta'), fallback to 0 or handle specially
+      """
+      parts = []
+      for part in version_str.split('.'):
+        try:
+          parts.append(int(part))
+        except ValueError:
+          parts.append(0)
+      return tuple(parts)
+
+    def version_fallback(self, docs_to_fetch):
+      """
+      For any doc name in docs_to_fetch that doesn't contain '~' (unversioned),
+      find if DevDocs has one or more versioned docs that start with that base name + '~'.
+      Default to highest version among them
       """
       r = requests.get(DEVDOCS_INDEX_ALL_URL)
       all_docs = r.json()
 
-      python_slugs = [d['slug'] for d in all_docs if d['slug'].startswith('python~')]
-
-      if not python_slugs:
-        return docs_to_fetch
-
-      version_regex = re.compile(r'python~(\d+\.\d+)')
-      versions = []
-      for slug in python_slugs:
-        match = version_regex.match(slug)
+      base_map = {}
+      pattern = re.compile(r'^(.+?)~(.+)$')
+      for doc in all_docs:
+        slug = doc['slug']
+        match = pattern.match(slug)
         if match:
-          major_minor_str = match.group(1)
-          major_str, minor_str = major_minor_str.split('.')
-          major = int(major_str)
-          minor = int(minor_str)
-          versions.append((major, minor))
-      if not versions:
-        return docs_to_fetch
-
-      versions.sort()
-      (latest_major, latest_minor) = versions[-1]
-      latest_python_slug = f"python~{latest_major}.{latest_minor}"
-
-      new_docs_to_fetch = []
-      for slug in docs_to_fetch:
-        if slug == "python":
-          new_docs_to_fetch.append(latest_python_slug)
+          base_name = match.group(1)
+          base_map.setdefault(base_name, []).append(slug)
+      for base, slugs in base_map.items():
+        slug_version_pairs = []
+        for s in slugs:
+          version_part = s.split('~', 1)[1]
+          slug_version_pairs.append((s, self.parse_version_to_tuple(version_part)))
+        slug_version_pairs.sort(key=lambda x: x[1])
+        base_map[base] = [p[0] for p in slug_version_pairs]
+      new_docs = []
+      for doc in docs_to_fetch:
+        if '~' in doc:
+          new_docs.append(doc)
         else:
-          new_docs_to_fetch.append(slug)
-      return new_docs_to_fetch
+          if doc in base_map:
+            highest_versioned_slug = base_map[doc][-1]
+            new_docs.append(highest_versioned_slug)
+          else:
+            new_docs.append(doc)
+
+      return new_docs
