@@ -47,7 +47,7 @@ class DevdocsExtension(Extension):
 
         # initialize DevDocs service.
         self.devdocs_svc = DevDocsService(LOGGING,
-                                          os.path.join(CACHE_DIR, 'devdocs'))
+                                          os.path.join(CACHE_PATH, 'devdocs'))
 
     def index_docs(self):
         """ Creates a local index of all the DevDocs resources """
