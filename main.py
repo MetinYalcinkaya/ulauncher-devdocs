@@ -19,7 +19,7 @@ from ulauncher.api.shared.action.OpenAction import OpenAction
 from ulauncher.api.shared.action.SetUserQueryAction import SetUserQueryAction
 from ulauncher.api.shared.action.RunScriptAction import RunScriptAction
 from ulauncher.api.shared.action.ExtensionCustomAction import ExtensionCustomAction
-from ulauncher.config import CACHE_DIR
+from ulauncher.utils.migrate import CACHE_PATH
 from devdocs.devdocs_service import DevDocsService
 
 gi.require_version('Notify', '0.7')
